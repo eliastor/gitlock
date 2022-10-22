@@ -165,7 +165,7 @@ Usage:
     ${command} force-unlock <lock name>         Forces to unlock the lock. DANGEROUS!
                                                 It must be used only when you are absolutely sure 
                                                 that particular lock is stuck.
-                                                
+
     ${command} -h | --help                      Show this help
 
 Options:
@@ -196,7 +196,7 @@ while [ "$1" != "" ]; do
             echo "lock name must be provided"
             exit 1
         fi
-        showlock $2
+        showlock "$2"
         if [[ "$?" != 0 ]]; then
             echo "error during getting lock info. No such lock?"
             exit 1
@@ -256,7 +256,7 @@ TAG=""
 
 lockloop "$OPERATION" || exit $?
 
-("$@")
+"$@"
 
 echo "Releasing lock $TAG"
 clean "$TAG"
