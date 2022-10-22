@@ -13,7 +13,6 @@ tagtrylock() {
 
 showlock() {
     TAG="$1"
-    echo "$1"
     git tag -l --format='%0auser%09%09%(taggername)%0a%0a%(body)' $TAG | grep '.' || return 1
     echo ""
 }
@@ -108,7 +107,7 @@ lockloop() {
     LASTLOCKEDTAG="__"
     TAG=""
     while true; do # in fact there must be timeout or number of tries limit
-        TAG="lock-$(uuid -v4)"
+        TAG="lock-$(cat /dev/urandom | head -c 256  | sha1sum | cut -d " " -f1)"
         LOCKEDTAG=""
         cycle "$TAG" "$OPERATION"
         RESULT="$?"
@@ -196,6 +195,8 @@ while [ "$1" != "" ]; do
             echo "lock name must be provided"
             exit 1
         fi
+        
+        echo "$2"
         showlock "$2"
         if [[ "$?" != 0 ]]; then
             echo "error during getting lock info. No such lock?"
@@ -257,9 +258,17 @@ TAG=""
 
 lockloop "$OPERATION" || exit $?
 echo "Acquired lock $TAG"
+
+cleanup() {
+    clean "$TAG"
+}
+
+trap cleanup EXIT
+
 ("$@")
+RESULT="$?"
 
 echo "Releasing lock $TAG"
-clean "$TAG"
+clean "$TAG" || true
 
-exit $?
+exit $RESULT
