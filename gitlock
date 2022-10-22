@@ -1,0 +1,264 @@
+#!/bin/bash
+
+tagtrylock() {
+    TAG="$1"
+    OPERATION="$2"
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null || return -4
+    # check if lock already exists.
+
+    git tag -a -m "aa" -m "login"$'\t'$'\t'"$(whoami 2>/dev/null)" -m "host"$'\t'$'\t'"$(hostname -s)" -m "stime"$'\t'$'\t'"$(date +%Y-%d-%m-%H%M%S)" -m "op"$'\t'$'\t'"$OPERATION"  $TAG || exit 1
+    git push origin $TAG 2> /dev/null || exit -5
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null || return -6
+}
+
+showlock() {
+    TAG="$1"
+    echo "$1"
+    git tag -l --format='%0auser%09%09%(taggername)%0a%0a%(body)' $TAG | grep '.' || return 1
+    echo ""
+}
+
+_listlocks() {
+    LOCKEDTAG=""
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null || return -4
+    ALLTAGLINES="$(git tag -l --format='%(tag)%09%(taggerdate)' 'lock-*' | sort -n)"
+    echo -e "LOCK NAME\t\t\t\t\tTIME"
+    echo "$ALLTAGLINES"
+}
+
+check() {
+    TAG="$1"
+
+    LOCALTAGTIME="$(git tag -l --format='%(taggerdate:unix)' $TAG)"
+
+    ALLTAGLINES="$(git tag -l --format='%(taggerdate:unix) %(tag)' 'lock-*')"
+
+    # add check of local tag existence
+   
+    if [[ "$ALLTAGLINES" != *"$TAG"* ]]; then
+        return -3 # sync of upstream is errored
+    fi
+
+    TAGLINES="$(git tag -l --format='%(taggerdate:unix) %(tag)' 'lock-*' | grep -v $TAG)"
+    LOCKEDTAG=""
+
+    while IFS= read -r TAGLINE; do
+        if [[ "$TAGLINE" == "" ]]; then
+            continue
+        fi
+        TAGTIME="$(echo $TAGLINE | cut -d " " -f1)"
+        TAGNAME="$(echo $TAGLINE | cut -d " " -f2)"
+        if (( "$TAGTIME" < "$LOCALTAGTIME" )); then
+            LOCKEDTAG="$TAGNAME"
+            return 1 #  this lock attempt is not successful
+        elif (( "$TAGTIME" == "$LOCALTAGTIME" )); then
+            if [[ "$TAG" < "$TAGNAME" ]]; then
+                LOCKEDTAG="$TAGNAME"
+                return 1 #  this lock attempt is not successful
+            elif  [[ "$TAG" > "$TAGNAME" ]]; then
+                continue # this lock attempt is successful
+            else
+                LOCKEDTAG="$TAGNAME"
+                return -1 # it's almost impossible to get same time and lock name
+            fi
+        else 
+            continue
+        fi
+    done <<< "${TAGLINES}"
+
+    return $?
+}
+
+clean()  {
+    TAG="$1"
+    git push origin --delete $TAG 2> /dev/null
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null  || exit -7 
+}
+
+cycle() {
+    TAG="$1"
+    OPERATION="$2"
+    LOCKEDTAG=""
+    tagtrylock "$TAG" "$OPERATION" || return $?
+    check "$TAG"
+    RESULT="$?"
+    case "$RESULT" in
+        0)  
+            # echo "Successfully locked: $TAG"
+            return 0
+        ;;
+        1)
+            # echo "Waiting for unlock"
+            clean "$TAG"
+            return 1
+        ;;
+        *)
+            clean "$TAG"
+            exit "$RESULT"
+            return "$RESULT"
+        ;;
+    esac
+    return $?
+}
+
+lockloop() {
+    OPERATION="$1"
+    CNT=0
+    LOCKEDTAG=""
+    LASTLOCKEDTAG="__"
+    TAG=""
+    while true; do # in fact there must be timeout or number of tries limit
+        TAG="lock-$(uuid -v4)"
+        LOCKEDTAG=""
+        cycle "$TAG" "$OPERATION"
+        RESULT="$?"
+        
+        case "$RESULT" in
+        0)
+            echo ""
+            echo "Successfully locked: $TAG"
+            return 0
+        ;;
+        1)  
+            if (( CNT == 0 )); then
+                # LASTLOCKEDTAG="$LOCKEDTAG"
+                echo "Already locked by: $LOCKEDTAG"
+                showlock "$LOCKEDTAG"
+                echo -n "Waiting for unlock.."
+            else
+                echo -n "."
+            fi
+
+            sleep "$__SLEEPDURATION"
+        ;;
+        252)
+            echo "git error: check connectivity and configration to origin repo"
+            clean "$TAG"
+            exit "$RESULT"
+        ;;
+        *)
+            echo "error:" "$RESULT"
+            clean "$TAG"
+            exit "$RESULT"
+        ;;
+        esac
+        ((CNT=CNT+1))
+    done
+
+    return $?
+}
+
+_usage() {
+    local command="./gitlock"
+    
+      cat << EOF
+Usage:
+
+    ${command} exec <command> [<arg1>...]       Acquires lock, executes command with arguments and
+                                                releases the lock.
+                                                Waits for concurrent locks to be released
+
+    ${command} list-locks                       Lists current locks
+
+    ${command} show-lock <lock name>            Shows information about lock
+
+    ${command} force-unlock <lock name>         Forces to unlock the lock. DANGEROUS!
+                                                It must be used only when you are absolutely sure 
+                                                that particular lock is stuck.
+                                                
+    ${command} -h | --help                      Show this help
+
+Options:
+    -o | --operation        Set operation to be stored in lock.
+                            By default it's "lock"
+    -d | --delay            Set delay in seconds during polling locks from remote repo 
+
+EOF
+}
+
+OPERATION="lock"
+__SLEEPDURATION=5
+
+while [ "$1" != "" ]; do
+    case $1 in
+      -h | --help)
+        _usage
+        exit
+        ;;
+      -o | --operation)
+        OPERATION="$1"
+        ;;
+      -d | --delay)
+        __SLEEPDURATION="$1"
+        ;;
+      show-lock)
+        if [[ "$2" == "" ]]; then
+            echo "lock name must be provided"
+            exit 1
+        fi
+        showlock $2
+        if [[ "$?" != 0 ]]; then
+            echo "error during getting lock info. No such lock?"
+            exit 1
+        fi
+        exit 0
+      ;;
+      force-unlock)
+        if [[ "$2" == "" ]]; then
+            echo "lock name must be provided"
+            exit 1
+        fi
+
+        showlock "$2" 
+        if [[ "$?" != 0 ]]; then
+            echo "error during getting lock info. No such lock?"
+            exit 1
+        fi
+
+        echo "Are you sure to unlock? [yes/No]:"
+        read -r CONTINUE
+        if [[ "$CONTINUE" != "yes" ]]; then
+            echo "no \"yes\" was given. Abort."
+            exit 1
+        fi
+        clean "$2"
+        if [[ "$?" != 0 ]]; then
+            echo "error during unlock"
+            exit 1
+        fi
+        
+        exit 0
+      ;;
+      list-locks)
+        _listlocks
+        exit 0
+        ;;
+      exec)
+        break;
+        ;;
+      * )
+        echo "no valid command provided."
+        _usage
+        exit 1
+        ;;
+    esac
+    shift
+done
+
+if [[ "$1" == "" ]]; then
+    echo "no valid command provided."
+    _usage  
+    exit 1
+fi
+
+# start GC
+TAG=""
+
+lockloop "$OPERATION" || exit $?
+
+("$@")
+
+echo "Releasing lock $TAG"
+clean "$TAG"
+
+exit $?
