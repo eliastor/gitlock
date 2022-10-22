@@ -3,13 +3,13 @@
 function tagtrylock() {
     TAG="$1"
     OPERATION="$2"
-    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*'
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null
 
     # check if lock already exists.
 
     git tag -a -m "user $(git config user.name)" -m "host   $(hostname -s)" -m "stime  $(date +%Y-%d-%m-%H%M%S)" -m "op $OPERATION"  $TAG
-    git push origin $TAG >/dev/nul
-    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*'
+    git push origin $TAG 2> /dev/null
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null
 }
 
 function showlock() {
@@ -62,8 +62,8 @@ function check() {
 
 function clean()  {
     TAG="$1"
-    git push origin --delete $TAG
-    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*'
+    git push origin --delete $TAG 2> /dev/null
+    git fetch origin --prune --tags '+refs/tags/lock-*:refs/tags/lock-*' 2> /dev/null
 }
 
 function cycle() {
@@ -74,7 +74,7 @@ function cycle() {
     RESULT="$?"
     case "$RESULT" in
         0)  
-            echo "Locked"
+            echo "Successfully locked: $TAG"
             return 0
         ;;
         1)
@@ -144,9 +144,7 @@ done
 
 lockloop "$OPERATION"
 
-echo $TAG
-
-$@
+"$@"
 
 clean "$TAG"
 
