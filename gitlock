@@ -234,6 +234,7 @@ while [ "$1" != "" ]; do
         exit 0
         ;;
       exec)
+        shift
         break;
         ;;
       * )
@@ -255,8 +256,8 @@ fi
 TAG=""
 
 lockloop "$OPERATION" || exit $?
-
-"$@"
+echo "Acquired lock $TAG"
+("$@")
 
 echo "Releasing lock $TAG"
 clean "$TAG"
