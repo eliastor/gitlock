@@ -40,7 +40,7 @@ To force release of the lock (DANGEROUS).
 It must be used only when you are absolutely sure that particular lock is stuck.
 
 ```
-./gitlockforce-unlock <lock name>
+./gitlock force-unlock <lock name>
 ```
 
 ## Flow
