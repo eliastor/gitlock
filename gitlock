@@ -157,9 +157,9 @@ Usage:
                                                 releases the lock.
                                                 Waits for concurrent locks to be released
 
-    ${command} list-locks                       Lists current locks
+    ${command} list                             Lists current locks
 
-    ${command} show-lock <lock name>            Shows information about lock
+    ${command} show <lock name>                 Shows information about lock
 
     ${command} force-unlock <lock name>         Forces to unlock the lock. DANGEROUS!
                                                 It must be used only when you are absolutely sure 
@@ -190,7 +190,7 @@ while [ "$1" != "" ]; do
       -d | --delay)
         __SLEEPDURATION="$1"
         ;;
-      show-lock)
+      show)
         if [[ "$2" == "" ]]; then
             echo "lock name must be provided"
             exit 1
@@ -230,7 +230,7 @@ while [ "$1" != "" ]; do
         
         exit 0
       ;;
-      list-locks)
+      list)
         _listlocks
         exit 0
         ;;

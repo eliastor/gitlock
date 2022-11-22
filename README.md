@@ -28,13 +28,13 @@ After execution gitlock will release the lock from origin.
 To list current locks:
 
 ```
-git lock list-locks
+git lock list
 ```
 
 To get info about lock:
 
 ```
-git lock show-lock <lock name>
+git lock show <lock name>
 ```
 
 To force release of the lock (DANGEROUS).
