@@ -11,14 +11,15 @@ Copy gitlock to your repository with configured origin repo.
 
 You should be able to push tags to the origin.
 
-Run `./gitlock exec <command> <args...>`
+Run `git lock exec <command> <args...>`
 
 For example:
 
 ```
 wget https://raw.githubusercontent.com/eliastor/gitlock/master/gitlock
-chmod +x gitlock
-./gitlock exec uname -a
+sudo mv gitlock /usr/local/bin/git-lock
+sudo chmod +x /usr/local/bin/git-lock
+git-lock exec uname -a
 ```
 
 In example above `uname -a` will be executed only after successful lock of repo in origin.
@@ -27,20 +28,20 @@ After execution gitlock will release the lock from origin.
 To list current locks:
 
 ```
-./gitlock list-locks
+git lock list-locks
 ```
 
 To get info about lock:
 
 ```
-./gitlock show-lock <lock name>
+git lock show-lock <lock name>
 ```
 
 To force release of the lock (DANGEROUS).
 It must be used only when you are absolutely sure that particular lock is stuck.
 
 ```
-./gitlock force-unlock <lock name>
+git lock force-unlock <lock name>
 ```
 
 ## Flow
