@@ -148,7 +148,7 @@ lockloop() {
 }
 
 _usage() {
-    local command="./gitlock"
+    local command="${0##*[/\\]}"
     
       cat << EOF
 Usage:
