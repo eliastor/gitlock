@@ -7,7 +7,7 @@
 
 ## Usage
 
-Copy gitlock to your repository with configured origin repo.
+Copy gitlock to your $PATH (for example to /usr/local/bin/git-lock) and run it as git subcommand.
 
 You should be able to push tags to the origin.
 
